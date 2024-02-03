@@ -24,14 +24,6 @@ typedef struct {
   int has_data;
 } FluToken;
 
-typedef struct {
-  size_t size;
-  union {
-    char *ident;
-    void *raw;
-  } data;
-} FluTokenData;
-
 size_t flu_lex(FILE *in, FILE *out, char **err) {
   int escaped = 0;
   char c = '\0';
@@ -59,7 +51,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
     case TK_RIGHT_PARENTHESIS:
       token.type = c;
       token.has_data = 0;
-      serialize(out, token);
+      if (!serialize(out, token)) {
+        assert(asprintf(err, "failed to serialize token '%c' at bytes %ld", c,
+                        ftell(in)));
+        return ftell(in);
+      }
       continue;
 
     default: {
@@ -67,7 +63,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
       if (isalpha(c)) {
         token.type = TK_IDENT;
         token.has_data = 1;
-        serialize(out, token);
+        if (!serialize(out, token)) {
+          assert(asprintf(err, "failed to serialize identifier at bytes %ld",
+                          ftell(in)));
+          return ftell(in);
+        }
 
         // Token data.
         vector_reset(&vec);
@@ -76,10 +76,12 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
         } while (isalnum((c = fgetc(in))));
         fseek(in, -1, SEEK_CUR);
 
-        SerdeData data = {0};
-        data.size = vec.len;
-        data.data = vec.data;
-        serialize_data(out, data);
+        if (!serialize_data(out, vec.data, vec.len + 1)) {
+          assert(asprintf(err,
+                          "failed to serialize identifier '%s' at bytes %ld",
+                          (char *)vec.data, ftell(in)));
+          return ftell(in);
+        }
 
         continue;
       }
@@ -88,7 +90,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
       if (isdigit(c)) {
         token.type = TK_NUMBER;
         token.has_data = 1;
-        serialize(out, token);
+        if (!serialize(out, token)) {
+          assert(asprintf(err, "failed to serialize number at bytes %ld",
+                          ftell(in)));
+          return ftell(in);
+        }
 
         vector_reset(&vec);
         do {
@@ -104,10 +110,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
         }
         fseek(in, -1, SEEK_CUR);
 
-        SerdeData data = {0};
-        data.size = vec.len;
-        data.data = vec.data;
-        serialize_data(out, data);
+        if (!serialize_data(out, vec.data, vec.len + 1)) {
+          assert(asprintf(err, "failed to serialize number '%s' at bytes %ld",
+                          (char *)vec.data, ftell(in)));
+          return ftell(in);
+        }
 
         continue;
       }
@@ -116,7 +123,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
       if (c == '"' && !escaped) {
         token.type = TK_STRING;
         token.has_data = 1;
-        serialize(out, token);
+        if (!serialize(out, token)) {
+          assert(asprintf(err, "failed to serialize string at bytes %ld",
+                          ftell(in)));
+          return ftell(in);
+        }
 
         // Skip ".
         c = fgetc(in);
@@ -130,10 +141,11 @@ size_t flu_lex(FILE *in, FILE *out, char **err) {
           c = fgetc(in);
         }
 
-        SerdeData data = {0};
-        data.size = vec.len;
-        data.data = vec.data;
-        serialize_data(out, data);
+        if (!serialize_data(out, vec.data, vec.len + 1)) {
+          assert(asprintf(err, "failed to serialize string '%s' at bytes %ld",
+                          (char *)vec.data, ftell(in)));
+          return ftell(in);
+        }
 
         continue;
       }
