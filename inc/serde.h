@@ -4,54 +4,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define serialize(out, data)                                                   \
-  serialize_data(out, (SerdeData){sizeof(data), &data})
+#define serialize(out, data) serialize_data(out, &data, sizeof(data))
 
-typedef struct {
-  size_t size;
-  void *data;
-} SerdeData;
-
-int serialize_data(FILE *stream, SerdeData data) {
+int serialize_data(FILE *stream, void *data, size_t size) {
   // Write header.
-  if (fwrite(&data.size, sizeof(size_t), 1, stream) < 1) {
+  if (fwrite(&size, sizeof(size_t), 1, stream) < 1) {
     return 0;
   }
 
   // Write data itself.
-  if (fwrite(data.data, data.size, 1, stream) < 1) {
+  if (fwrite(data, size, 1, stream) < 1) {
     return 0;
   }
 
-  // End line.
-  if (fwrite("\n", sizeof(char), 1, stream) < 1) {
+  if (fputc('\n', stream) == EOF) {
     return 0;
   }
 
   return 1;
 }
 
-int deserialize_data(FILE *stream, SerdeData *data) {
+int deserialize_size(FILE *stream, size_t *size) {
   // Read header.
-  if (fread(&data->size, sizeof(size_t), 1, stream) != 1) {
+  if (fread(size, sizeof(size_t), 1, stream) != 1) {
     return 0;
   }
 
-  // Alloc body.
-  data->data = calloc(1, data->size);
-  if (data->data == NULL) {
-    return 0;
-  }
+  return 1;
+}
 
+int deserialize_data(FILE *stream, void *data, size_t size) {
   // Read body (+1 for newline).
-  if (fread(data->data, data->size, 1, stream) != 1) {
+  if (fread(data, size, 1, stream) != 1) {
     return 0;
   }
 
-  // Read new line.
-  char c;
-  size_t read = fread(&c, sizeof(char), 1, stream);
-  (void)read;
+  fgetc(stream);
 
   return 1;
 }
