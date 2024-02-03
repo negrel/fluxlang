@@ -12,7 +12,7 @@ CMD_SRCS := $(shell find $(CMD_DIR)/$(FLUX_CMD) -regex '.+\.c')
 
 CC ?= clang
 CFLAGS ?=
-CFLAGS := $(CFLAGS) -Wall -Wextra -I$(INC_DIR) -I$$PWD
+CFLAGS := $(CFLAGS) -ggdb -Wall -Wextra -I$(INC_DIR) -I$$PWD
 
 AR := ar
 
