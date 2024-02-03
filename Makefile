@@ -1,5 +1,8 @@
 include variables.mk
 
+.PHONY: build/all
+build/all: $(FLUX_CMDS:$(CMD_DIR)/%=build/%)
+
 build/%: FLUX_CMD=$*
 build/%:
 	$(MAKE) $(BUILD_DIR)/$(FLUX_CMD)
