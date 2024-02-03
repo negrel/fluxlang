@@ -4,14 +4,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int flu_serialize(FILE *stream, void *data, size_t data_size) {
+typedef struct {
+  size_t size;
+  void *data;
+} flu_data_t;
+
+int flu_serialize(FILE *stream, flu_data_t data) {
   // Write header.
-  if (fwrite(&data_size, sizeof(size_t), 1, stream) < 1) {
+  if (fwrite(&data.size, sizeof(size_t), 1, stream) < 1) {
     return 0;
   }
 
   // Write data itself.
-  if (fwrite(data, data_size, 1, stream) < 1) {
+  if (fwrite(data.data, data.size, 1, stream) < 1) {
     return 0;
   }
 
@@ -23,20 +28,20 @@ int flu_serialize(FILE *stream, void *data, size_t data_size) {
   return 1;
 }
 
-int flu_deserialize(FILE *stream, void **data, size_t *data_size) {
+int flu_deserialize(FILE *stream, flu_data_t *data) {
   // Read header.
-  if (fread(data_size, sizeof(size_t), 1, stream) != 1) {
+  if (fread(&data->size, sizeof(size_t), 1, stream) != 1) {
     return 0;
   }
 
   // Alloc body.
-  *data = calloc(1, *data_size);
-  if (*data == NULL) {
+  data->data = calloc(1, data->size);
+  if (data->data == NULL) {
     return 0;
   }
 
   // Read body (+1 for newline).
-  if (fread(*data, *data_size, 1, stream) != 1) {
+  if (fread(data->data, data->size, 1, stream) != 1) {
     return 0;
   }
 

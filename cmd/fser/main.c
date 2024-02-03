@@ -11,7 +11,11 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < argc; i++) {
     size_t len = strlen(argv[i]) + 1; // +1 for null byte.
-    if (!flu_serialize(stdout, argv[i], sizeof(char) * len)) {
+    flu_data_t data = {
+        .size = sizeof(char) * len,
+        .data = argv[i],
+    };
+    if (!flu_serialize(stdout, data)) {
       flu_errorf("failed to serialized data: %s", strerror(errno));
     }
   }
