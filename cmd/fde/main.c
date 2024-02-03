@@ -8,8 +8,8 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  flu_data_t data = {};
-  while ((flu_deserialize(stdin, &data))) {
+  SerdeData data = {};
+  while ((deserialize_data(stdin, &data))) {
     printf("DATA_SIZE: %zu | %s\n", data.size, (char *)data.data);
   }
   if (ferror(stdin)) {

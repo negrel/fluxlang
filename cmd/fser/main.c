@@ -11,11 +11,11 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < argc; i++) {
     size_t len = strlen(argv[i]) + 1; // +1 for null byte.
-    flu_data_t data = {
+    SerdeData data = {
         .size = sizeof(char) * len,
         .data = argv[i],
     };
-    if (!flu_serialize(stdout, data)) {
+    if (!serialize_data(stdout, data)) {
       flu_errorf("failed to serialized data: %s", strerror(errno));
     }
   }

@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include "serde.h"
+#include "stream.h"
+#include "vector.h"
 
 typedef enum {
   TK_LEFT_PARENTHESIS = '(',
@@ -15,12 +17,12 @@ typedef enum {
   TK_IDENT = 'I',
   TK_STRING = 'S',
   TK_NUMBER = 'D',
-} flu_token_type_t;
+} FluTokenType;
 
 typedef struct {
-  flu_token_type_t type;
+  FluTokenType type;
   int has_data;
-} flu_token_t;
+} FluToken;
 
 typedef struct {
   size_t size;
@@ -28,113 +30,120 @@ typedef struct {
     char *ident;
     void *raw;
   } data;
-} flu_token_data_t;
+} FluTokenData;
 
-typedef struct {
-  char *cursor;
-  char *error;
-} flu_lexer_t;
+size_t flu_lex(FILE *in, FILE *out, char **err) {
+  int escaped = 0;
+  char c = '\0';
+  Vector vec = vector_new(32 * 1024, sizeof(char));
 
-int flu_lex(flu_lexer_t *lexer, flu_token_t *token, flu_token_data_t *data) {
+  while ((c = fgetc(in))) {
+    if (c == '\\') {
+      escaped = 1;
+      c = fgetc(in);
+    }
 
-  while (1) {
-    switch (*lexer->cursor) {
+    FluToken token = {0};
+
+    switch (c) {
+    case EOF:
+      return ftell(in);
+
       // Skip whitespaces.
     case '\t':
     case ' ':
     case '\n':
-      lexer->cursor++;
       continue;
 
     case TK_LEFT_PARENTHESIS:
     case TK_RIGHT_PARENTHESIS:
-      token->type = *lexer->cursor;
-      token->has_data = 0;
-      lexer->cursor++;
-      return 1;
-
-    case '\0':
-      return 0;
+      token.type = c;
+      token.has_data = 0;
+      serialize(out, token);
+      continue;
 
     default: {
       // Identifier.
-      if (isalpha(*lexer->cursor)) {
-        token->type = TK_IDENT;
-        token->has_data = 1;
+      if (isalpha(c)) {
+        token.type = TK_IDENT;
+        token.has_data = 1;
+        serialize(out, token);
 
-        char *start = lexer->cursor;
-        while (isalnum(*lexer->cursor)) {
-          lexer->cursor++;
-        }
-        data->size = lexer->cursor - start;
+        // Token data.
+        vector_reset(&vec);
+        do {
+          vector_push(&vec, c);
+        } while (isalnum((c = fgetc(in))));
+        fseek(in, -1, SEEK_CUR);
 
-        data->data.ident = calloc(data->size + 1, sizeof(char));
-        strncpy(data->data.ident, start, data->size);
+        SerdeData data = {0};
+        data.size = vec.len;
+        data.data = vec.data;
+        serialize_data(out, data);
 
-        return 1;
+        continue;
       }
 
       // Number.
-      if (isdigit(*lexer->cursor)) {
-        token->type = TK_NUMBER;
-        token->has_data = 1;
+      if (isdigit(c)) {
+        token.type = TK_NUMBER;
+        token.has_data = 1;
+        serialize(out, token);
 
-        char *start = lexer->cursor;
-        while (isdigit(*lexer->cursor)) {
-          lexer->cursor++;
-        }
+        vector_reset(&vec);
+        do {
+          vector_push(&vec, c);
+        } while (isdigit((c = fgetc(in))));
 
         // Floating point number.
-        if (*lexer->cursor == '.') {
-          lexer->cursor++;
+        if (c == '.') {
           // Decimals.
-          while (isdigit(*lexer->cursor)) {
-            lexer->cursor++;
-          }
+          do {
+            vector_push(&vec, c);
+          } while (isdigit((c = fgetc(in))));
         }
+        fseek(in, -1, SEEK_CUR);
 
-        data->size = lexer->cursor - start;
+        SerdeData data = {0};
+        data.size = vec.len;
+        data.data = vec.data;
+        serialize_data(out, data);
 
-        data->data.ident = calloc(data->size + 1, sizeof(char));
-        strncpy(data->data.ident, start, data->size);
-
-        return 1;
+        continue;
       }
 
       // String literal.
-      if (*lexer->cursor == '"' || *lexer->cursor == '\'') {
-        token->type = TK_STRING;
-        token->has_data = 1;
+      if (c == '"' && !escaped) {
+        token.type = TK_STRING;
+        token.has_data = 1;
+        serialize(out, token);
 
-        char delim = *lexer->cursor;
-        char prev = *lexer->cursor;
+        // Skip ".
+        c = fgetc(in);
 
-        char *start = ++lexer->cursor;
-        while (*lexer->cursor && *lexer->cursor != delim && prev != '\\') {
-          prev = *lexer->cursor++;
+        // Collect string.
+        vector_reset(&vec);
+        char prev = '\0';
+        while ((prev == '\\' && c == '"') || (c != '"' && c != EOF)) {
+          vector_push(&vec, c);
+          prev = c;
+          c = fgetc(in);
         }
 
-        data->size = lexer->cursor - start;
+        SerdeData data = {0};
+        data.size = vec.len;
+        data.data = vec.data;
+        serialize_data(out, data);
 
-        data->data.ident = calloc(data->size + 1, sizeof(char));
-        strncpy(data->data.ident, start, data->size);
-
-        lexer->cursor++;
-        return 1;
+        continue;
       }
 
-      assert(asprintf(&lexer->error,
-                      "unexpected char at position 0 in sequence '%s'",
-                      lexer->cursor));
-
-      return 0;
+      assert(asprintf(err, "unexpected char '%c' at bytes %ld", c, ftell(in)));
     }
     }
   }
+
+  return ftell(in);
 }
-
-inline int flu_lex_eol(flu_lexer_t *lexer) { return *lexer->cursor == '\0'; }
-
-inline char *flu_lex_error(flu_lexer_t *lexer) { return lexer->error; }
 
 #endif

@@ -4,12 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define serialize(out, data)                                                   \
+  serialize_data(out, (SerdeData){sizeof(data), &data})
+
 typedef struct {
   size_t size;
   void *data;
-} flu_data_t;
+} SerdeData;
 
-int flu_serialize(FILE *stream, flu_data_t data) {
+int serialize_data(FILE *stream, SerdeData data) {
   // Write header.
   if (fwrite(&data.size, sizeof(size_t), 1, stream) < 1) {
     return 0;
@@ -28,7 +31,7 @@ int flu_serialize(FILE *stream, flu_data_t data) {
   return 1;
 }
 
-int flu_deserialize(FILE *stream, flu_data_t *data) {
+int deserialize_data(FILE *stream, SerdeData *data) {
   // Read header.
   if (fread(&data->size, sizeof(size_t), 1, stream) != 1) {
     return 0;

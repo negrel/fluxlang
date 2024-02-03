@@ -12,19 +12,19 @@ int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  flu_data_t serde_token = {0};
-  flu_data_t serde_token_data = {0};
-  while (flu_deserialize(stdin, &serde_token)) {
-    flu_token_t *token = (flu_token_t *)(serde_token.data);
-    flu_token_type_t token_type = token->type;
+  SerdeData serde_token = {0};
+  SerdeData serde_token_data = {0};
+  while (deserialize_data(stdin, &serde_token)) {
+    FluToken *token = (FluToken *)(serde_token.data);
+    FluTokenType token_type = token->type;
 
     if (token->has_data) {
       // Deserialize token data.
-      if (!flu_deserialize(stdin, &serde_token_data)) {
+      if (!deserialize_data(stdin, &serde_token_data)) {
         break;
       }
 
-      flu_token_data_t *token_data = (flu_token_data_t *)&serde_token_data;
+      FluTokenData *token_data = (FluTokenData *)&serde_token_data;
       if (token_type == TK_STRING) {
         printf("\"%s\" ", token_data->data.ident);
       } else {
