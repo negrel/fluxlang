@@ -11,9 +11,11 @@ FLUX_CMDS ?= $(wildcard $(CMD_DIR)/*)
 INCS := $(shell find $(INC_DIR) -regex '.+\.h')
 CMD_SRCS := $(shell find $(CMD_DIR)/$(FLUX_CMD) -regex '.+\.c')
 
-CC ?= clang
+CC := clang
 CFLAGS ?=
-CFLAGS := $(CFLAGS) -ggdb -Wall -Wextra -I$(INC_DIR) -I$$PWD
+CFLAGS := $(CFLAGS) -std=c11 -ggdb \
+	-Wall -Wextra -Werror -pedantic -Wmissing-prototypes -Wstrict-prototypes \
+	-I$(INC_DIR) -I$$PWD
 
 AR := ar
 
